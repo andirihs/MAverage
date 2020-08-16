@@ -1,9 +1,9 @@
 [config]
 # exchange properties
 exchange = "bitmex"
-api_key = "YOUR_KEY"
-api_secret = "YOUR_SECRET"
-test = True
+api_key = "KpkvnVo5UPH1QegHUrg0y6dgIyzJSceJOE7bmtY4ObG"
+api_secret = "KAkh5hUJbLbzmCXuerQDFltdklWmMB25H8hhq6mYoFb"
+test = False
 
 # currency properties
 pair = "BTC/USD"
@@ -12,7 +12,7 @@ symbol = "XBTUSD"
 # bot properties
 daily_report = True
 trade_report = True
-short_in_percent = 50
+short_in_percent = 100
 # 1440 minutes = 1 day
 ma_minutes_short = 55
 ma_minutes_long = 200
