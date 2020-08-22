@@ -11,6 +11,7 @@ import socket
 import sqlite3
 import sys
 import time
+from math import floor
 from time import sleep
 from email import encoders
 from email.mime.base import MIMEBase
@@ -27,7 +28,7 @@ STATS = None
 EMAIL_SENT = False
 EMAIL_ONLY = False
 RESET = False
-STOP_ERRORS = ['nsufficient', 'too low', 'not_enough', 'margin_below', 'liquidation price']
+STOP_ERRORS = ['nsufficient', 'too low', 'not_enough', 'margin_below', 'liquidation price', 'closed_already', 'zero margin']
 RETRY_MESSAGE = 'Got an error %s %s, retrying in about 5 seconds...'
 
 
@@ -38,13 +39,14 @@ class ExchangeConfig:
 
         try:
             props = config['config']
-            self.bot_version = '0.7.20'
+            self.bot_version = '0.8.1'
             self.exchange = str(props['exchange']).strip('"').lower()
             self.api_key = str(props['api_key']).strip('"')
             self.api_secret = str(props['api_secret']).strip('"')
             self.test = bool(str(props['test']).strip('"').lower() == 'true')
             self.pair = str(props['pair']).strip('"')
             self.symbol = str(props['symbol']).strip('"')
+            self.net_deposits_in_base_currency = abs(float(props['net_deposits_in_base_currency']))
             self.leverage_default = abs(float(props['leverage_default']))
             self.apply_leverage = bool(str(props['apply_leverage']).strip('"').lower() == 'true')
             self.daily_report = bool(str(props['daily_report']).strip('"').lower() == 'true')
@@ -576,6 +578,8 @@ def get_net_deposits():
     Get deposits and withdraws to calculate the net deposits in crypto.
     return: net deposits
     """
+    if CONF.net_deposits_in_base_currency:
+        return CONF.net_deposits_in_base_currency
     try:
         currency = CONF.base if CONF.base != 'BTC' else 'XBt'
         if CONF.exchange == 'bitmex':
@@ -701,6 +705,9 @@ def update_stop_loss_trade(trade_id: str, stop_loss_price: float):
         EXCHANGE.private_put_trades_id({'id': trade_id, 'stop_loss': stop_loss_price})
 
     except (ccxt.ExchangeError, ccxt.NetworkError) as error:
+        if any(e in str(error.args) for e in STOP_ERRORS):
+            LOG.warning('Trade to be updated was closed already')
+            return
         LOG.error(RETRY_MESSAGE, type(error).__name__, str(error.args))
         sleep_for(4, 6)
         update_stop_loss_trade(trade_id, stop_loss_price)
@@ -1176,7 +1183,7 @@ def create_sell_order(price: float, amount_crypto: float, currency: dict = None)
     try:
         if CONF.exchange == 'bitmex':
             price = round(price * 2) / 2
-            order_size = round(price * amount_crypto)
+            order_size = floor(price * amount_crypto)
             new_order = EXCHANGE.create_limit_sell_order(CONF.pair, order_size, price)
         elif CONF.exchange == 'kraken':
             if CONF.apply_leverage and CONF.leverage_default > 1:
@@ -1219,7 +1226,7 @@ def create_buy_order(price: float, amount_crypto: float, currency: str = None):
     try:
         if CONF.exchange == 'bitmex':
             price = round(price * 2) / 2
-            order_size = round(price * amount_crypto)
+            order_size = floor(price * amount_crypto)
             new_order = EXCHANGE.create_limit_buy_order(CONF.pair, order_size, price)
         elif CONF.exchange == 'kraken':
             if CONF.apply_leverage and CONF.leverage_default > 1:
